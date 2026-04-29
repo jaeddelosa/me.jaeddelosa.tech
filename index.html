@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>zenOS // 朱・暮</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: radial-gradient(circle at 30% 20%, #2a100c, #070302);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            font-family: 'Courier New', 'Fira Code', 'JetBrains Mono', monospace;
+            position: relative;
+        }
+
+        /* Zen subtle circle motif (ensō spirit) */
+        body::before {
+            content: "⭘";
+            position: absolute;
+            top: 5%;
+            right: 5%;
+            font-size: 12vw;
+            opacity: 0.06;
+            color: #c07a6b;
+            pointer-events: none;
+            font-family: monospace;
+            transform: rotate(5deg);
+        }
+
+        .crt-frame {
+            background: #150c0a;
+            border-radius: 32px 32px 28px 28px;
+            padding: 20px 18px 22px 18px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255, 140, 100, 0.15);
+            border-bottom: 4px solid #7f3f2e;
+        }
+
+        .terminal {
+            background: #0b0605;
+            width: 100%;
+            max-width: 1000px;
+            min-width: 320px;
+            border-radius: 18px;
+            box-shadow: 0 0 0 1px rgba(220, 90, 60, 0.45), 0 0 0 3px rgba(40, 15, 10, 0.7), 0 0 28px rgba(200, 70, 40, 0.3);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(0.3px);
+            transition: box-shadow 0.25s ease;
+        }
+
+        .terminal:hover {
+            box-shadow: 0 0 0 1px #dc6a4a, 0 0 28px rgba(220, 85, 55, 0.65);
+        }
+
+        /* warm scanlines — crimson essence */
+        .terminal::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(180, 65, 45, 0.04) 0px,
+                rgba(180, 65, 45, 0.04) 2px,
+                transparent 2px,
+                transparent 7px
+            );
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .terminal::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 60%, rgba(30, 10, 5, 0.5));
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* gentle red pulse for text */
+        @keyframes zenGlow {
+            0% { text-shadow: 0 0 1px #cc6e55; }
+            100% { text-shadow: 0 0 4px #dd7f60, 0 0 1px #d47450; }
+        }
+
+        .status-bar {
+            background: #1f110d;
+            border-bottom: 1px solid #9f5540;
+            padding: 8px 18px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            font-family: 'Courier New', monospace;
+            color: #f0aa8c;
+            letter-spacing: 0.6px;
+            flex-wrap: wrap;
+            gap: 12px;
+            text-shadow: 0 0 2px #b56342;
+        }
+
+        .status-left, .status-right {
+            display: flex;
+            gap: 24px;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+        }
+
+        .status-label {
+            color: #e78f6e;
+            font-weight: bold;
+        }
+
+        .status-value {
+            color: #ffcfb3;
+        }
+
+        /* output area warm rust */
+        .output-area {
+            padding: 20px 20px 10px 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .output-area::-webkit-scrollbar {
+            width: 6px;
+        }
+        .output-area::-webkit-scrollbar-track {
+            background: #1f110d;
+        }
+        .output-area::-webkit-scrollbar-thumb {
+            background: #d97a58;
+            border-radius: 12px;
+        }
+
+        .line {
+            color: #f5bb9c;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-bottom: 3px;
+            animation: zenGlow 2.2s infinite alternate;
+        }
+
+        .line.warning {
+            color: #ffb980;
+        }
+        .line.error {
+            color: #ff947a;
+        }
+        .line.matrix {
+            color: #ff8a60;
+            text-shadow: 0 0 3px #bc543a;
+            font-weight: 500;
+        }
+        .line.shutdown {
+            color: #ff9780;
+            border-left: 3px solid #dd6644;
+            padding-left: 12px;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px 22px 20px;
+            border-top: 1px solid #914f3a;
+            background: #0b0605;
+        }
+
+        .prompt {
+            color: #ffb28a;
+            font-weight: bold;
+            font-size: 0.95rem;
+            background: #25130f;
+            padding: 3px 12px;
+            border-radius: 28px;
+            letter-spacing: 0.8px;
+            box-shadow: inset 0 0 4px #542e1f;
+        }
+
+        #cmdInput {
+            background: transparent;
+            border: none;
+            color: #ffe0cc;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            outline: none;
+            flex: 1;
+            caret-color: #ff7f58;
+        }
+
+        .cursor-blink {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background-color: #e67048;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            box-shadow: 0 0 4px #c95834;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes glitchText {
+            0% { transform: skew(0deg, 0deg); opacity: 1; }
+            95% { transform: skew(0deg, 0deg); opacity: 1; }
+            96% { transform: skew(1.5deg, 0.4deg); opacity: 0.9; text-shadow: -1px 0 #cc6a44; }
+            97% { transform: skew(-0.5deg, -0.2deg); opacity: 1; }
+            100% { transform: skew(0deg, 0deg); }
+        }
+
+        .glitch-line {
+            animation: glitchText 0.09s ease-in-out;
+        }
+
+        /* zen extra: tiny stone charm */
+        .status-left .status-item:first-child .status-label::before {
+            content: "◍ ";
+            font-size: 0.8rem;
+            color: #cd7a5a;
+        }
+    </style>
+</head>
+<body>
+<div class="crt-frame">
+<div class="terminal">
+    <div class="status-bar" id="statusBar">
+        <div class="status-left">
+            <div class="status-item"><span class="status-label">zenOS • 朱暮</span><span class="status-value" id="osVersion">8.0</span></div>
+            <div class="status-item"><span class="status-label">⎇ tty1</span></div>
+            <div class="status-item"><span class="status-label">user</span><span class="status-value" id="statusUser">──</span></div>
+        </div>
+        <div class="status-right">
+            <div class="status-item"><span class="status-label">🍂 uptime</span><span class="status-value" id="uptimeVal">0s</span></div>
+            <div class="status-item"><span class="status-label">☯ load</span><span class="status-value" id="loadVal">0.00</span></div>
+            <div class="status-item"><span class="status-label">🗻</span><span class="status-value" id="datetimeVal">--:--:--</span></div>
+        </div>
+    </div>
+    <div class="output-area" id="outputArea"></div>
+    <div id="inputContainer" class="input-line" style="display: none;">
+        <span class="prompt" id="promptSpan">$</span>
+        <input type="text" id="cmdInput" autocomplete="off" spellcheck="false">
+        <span class="cursor-blink"></span>
+    </div>
+</div>
+</div>
+
+<script>
+    // ----------------------------- ZEN RED TERMINAL · SERVICES & WORKS -----------------------------
+    const outputDiv = document.getElementById('outputArea');
+    const inputContainer = document.getElementById('inputContainer');
+    const cmdInput = document.getElementById('cmdInput');
+    const promptSpan = document.getElementById('promptSpan');
+    const statusUserSpan = document.getElementById('statusUser');
+    const uptimeSpan = document.getElementById('uptimeVal');
+    const loadSpan = document.getElementById('loadVal');
+    const datetimeSpan = document.getElementById('datetimeVal');
+
+    let state = 'boot';          // boot -> askName -> shell -> exited
+    let username = '';
+    let commandHistory = [];
+    let historyIndex = 0;
+    let bootStartTime = Date.now();
+    let loadInterval = null;
+    let clockInterval = null;
+
+    const WHATSAPP_LINK = "https://api.whatsapp.com/send/?phone=639810848049&text&type=phone_number&app_absent=0";
+
+    const coreCommands = ['portfolio', 'call', 'email', 'whatsapp', 'clear', 'help', 'exit'];
+    const extraCommands = ['fetch', 'date', 'whoami', 'matrix', 'stats'];
+    const allCommands = [...coreCommands, ...extraCommands];
+
+    function printLine(text, className = 'line') {
+        const div = document.createElement('div');
+        div.className = className;
+        div.textContent = text;
+        outputDiv.appendChild(div);
+        div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    function clearScreen() {
+        outputDiv.innerHTML = '';
+    }
+
+    function updateStatusBar() {
+        let elapsed = Math.floor((Date.now() - bootStartTime) / 1000);
+        let hours = Math.floor(elapsed / 3600);
+        let minutes = Math.floor((elapsed % 3600) / 60);
+        let seconds = elapsed % 60;
+        let uptimeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${seconds}s`;
+        if (elapsed < 60) uptimeStr = `${seconds}s`;
+        uptimeSpan.innerText = uptimeStr;
+
+        let fakeLoad = (0.2 + Math.random() * 1.5).toFixed(2);
+        loadSpan.innerText = fakeLoad;
+
+        const now = new Date();
+        datetimeSpan.innerText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute:'2-digit', second:'2-digit' });
+        
+        if (state === 'shell' && username) {
+            statusUserSpan.innerText = username;
+        } else if (state === 'askName') {
+            statusUserSpan.innerText = '?';
+        } else {
+            statusUserSpan.innerText = '──';
+        }
+    }
+
+    // warm boot sequence (zen infused)
+    function boot() {
+        const bootLines = [
+            "[    0.000000] zenOS 8.0 (Maple Rain) | Linux 6.8-zen (jaed@zenworks)",
+            "[    0.142731] CPU: 8 cores @ 3.9GHz · tranquility governors active",
+            "[    0.281049] Memory: 32GB DDR5 · 静寂 (seijaku) mode",
+            "[    0.419287] zenOS: loading kernel modules ··· [ 禅 OK ]",
+            "[    0.567932] terminal: crimson-zen interface ready [ 朱 OK ]",
+            "[    0.710648] systemd[1]: entering 'mindful' target",
+            "[    0.893012] [ OK ] Reached target zen-graphical",
+            "[    1.047295] Spawning login session on /dev/tty1 · どうぞ"
+        ];
+        let idx = 0;
+        function printNext() {
+            if (idx < bootLines.length) {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'line glitch-line';
+                lineDiv.textContent = bootLines[idx];
+                outputDiv.appendChild(lineDiv);
+                lineDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                idx++;
+                setTimeout(printNext, 85 + Math.random() * 55);
+            } else {
+                printLine("");
+                printLine("  ╭───────────────────────────────────────────╮");
+                printLine("  │   zenOS 8.0 (tty1)  —  “暮れ色・ZEN”     │");
+                printLine("  │   🍁  stillness echoes in the terminal    │");
+                printLine("  ╰───────────────────────────────────────────╯");
+                printLine("");
+                printLine("  ◍  enter your name to begin the walk ◍");
+                state = 'askName';
+                promptSpan.textContent = "login:";
+                inputContainer.style.display = 'flex';
+                cmdInput.value = '';
+                cmdInput.focus();
+                updateStatusBar();
+            }
+        }
+        printNext();
+    }
+
+    function setName(name) {
+        username = name.trim();
+        if (username === "") username = "kaze";
+        printLine(`🍂  verified. welcome, ${username}.  your session is calm.`);
+        printLine(`   last entry: ${new Date().toLocaleString()} · from foggy mountain`);
+        printLine("");
+        
+        // ascii with zen red spirit
+        printLine("    ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄ ");
+        printLine("   ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌");
+        printLine("   ▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀█░▌");
+        printLine("   ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌          ▐░▌       ▐░▌");
+        printLine("   ▐░█▄▄▄▄▄▄▄█░▌▐░▌       ▐░▌▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄█░▌");
+        printLine("   ▐░░░░░░░░░░░▌▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌");
+        printLine("   ▐░█▀▀▀▀█░█▀▀ ▐░▌       ▐░▌ ▀▀▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀▀▀ ");
+        printLine("   ▐░▌     ▐░▌  ▐░▌       ▐░▌          ▐░▌▐░▌          ");
+        printLine("   ▐░▌      ▐░▌ ▐░█▄▄▄▄▄▄▄█░▌ ▄▄▄▄▄▄▄▄▄█░▌▐░▌          ");
+        printLine("   ▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░▌          ");
+        printLine("    ▀         ▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀           ");
+        printLine("");
+        printLine("────────────────────────────────────────────────────────────");
+        printLine("  🍂  'help' – list all zen commands    ⎯   ⎯   ⎯");
+        printLine("  🍁  arrows ↑↓ history  |  tab → autocomplete");
+        printLine("────────────────────────────────────────────────────────────");
+        printLine("");
+        printLine(`  ${username}@zen:~$  ready for your intention.`);
+        printLine("");
+        
+        state = 'shell';
+        promptSpan.textContent = `${username}@zen:~$`;
+        cmdInput.value = '';
+        updateStatusBar();
+    }
+
+    function execute(cmdRaw) {
+        const cmd = cmdRaw.trim().toLowerCase();
+        if (cmd === "") return;
+
+        if (cmd === 'portfolio') {
+            // updated: services & works
+            printLine("🍁  opening services & works · Jaed's showcase");
+            setTimeout(() => window.open("https://jaedd.neocities.org/", "_blank"), 100);
+        } 
+        else if (cmd === 'call') {
+            printLine("📞  dialing +63 981 084 8049 ... ( 木漏れ日 )");
+            printLine("⚠️  pc/laptop call may not function. please use mobile device for voice.", "warning");
+            const userConfirmed = confirm("📱 Call attempt may fail on PC. proceed anyway? (real call via mobile recommended)");
+            if (userConfirmed) {
+                window.location.href = "tel:+639810848049";
+            } else {
+                printLine("call canceled · use mobile to reach +63 981 084 8049.", "line");
+            }
+        } 
+        else if (cmd === 'email') {
+            printLine("✉️  composing a letter to contact.jaed@proton.me ...");
+            setTimeout(() => window.location.href = "mailto:contact.jaed@proton.me", 100);
+        }
+        else if (cmd === 'whatsapp') {
+            printLine("📱  opening WhatsApp · silent echo to Jaed");
+            setTimeout(() => window.open(WHATSAPP_LINK, "_blank"), 100);
+        }
+        else if (cmd === 'help') {
+            printLine("");
+            printLine(" ╭───────────────────── 禅・HELP ─────────────────────╮");
+            printLine(" │  portfolio   – services & works showcase          │");
+            printLine(" │  call        – reach via phone (mobile advised)   │");
+            printLine(" │  email       – send a message (proton mail)       │");
+            printLine(" │  whatsapp    – chat on whatsapp                   │");
+            printLine(" │  fetch       – system haiku & specs               │");
+            printLine(" │  date        – current ephemeris                  │");
+            printLine(" │  whoami      – reflect your identity              │");
+            printLine(" │  matrix      – crimson rain (digital koans)       │");
+            printLine(" │  stats       – show live tranquility stats        │");
+            printLine(" │  clear       – wipe the scroll of thoughts        │");
+            printLine(" │  help        – this scroll of wisdom              │");
+            printLine(" │  exit        – close session · return to void     │");
+            printLine(" ╰──────────────────────────────────────────────────╯");
+            printLine("");
+        } 
+        else if (cmd === 'clear') {
+            clearScreen();
+        } 
+        else if (cmd === 'exit') {
+            exitSession();
+        }
+        else if (cmd === 'fetch') {
+            showFetch();
+        }
+        else if (cmd === 'date') {
+            printLine(`🍂  ${new Date().toString()}  ·  moment of awareness`);
+        }
+        else if (cmd === 'whoami') {
+            printLine(`🍁 ${username} (uid=1000) · groups: 1000(wanderer), 998(mono) · 心`);
+        }
+        else if (cmd === 'matrix') {
+            matrixEffect();
+        }
+        else if (cmd === 'stats') {
+            showStats();
+        }
+        else {
+            printLine(`bash: ${cmdRaw}: command not found. type 'help' for guidance.`, "line error");
+        }
+    }
+
+    function showFetch() {
+        let uptimeSec = Math.floor((Date.now() - bootStartTime) / 1000);
+        let uptimePretty = `${Math.floor(uptimeSec/3600)}h ${Math.floor((uptimeSec%3600)/60)}m ${uptimeSec%60}s`;
+        let memTotal = "32.0 GiB";
+        let memUsed = (Math.random() * 8 + 1.8).toFixed(1) + " GiB";
+        let cpuLoad = (Math.random() * 1.9 + 0.2).toFixed(2);
+        printLine("");
+        printLine("       ／＼   zenOS 8.0 (crimson-fall)");
+        printLine("      ( ಠ ͜ʖಠ)  ------------------------");
+        printLine("       ＞  ＜   OS: zenOS 8.0 x86_64 · 禅");
+        printLine("      (___/\\__) Kernel: 6.8-zen-tsuki");
+        printLine("        ████    Uptime: " + uptimePretty);
+        printLine("      ████████  Shell: zensh 3.0 (朱)");
+        printLine("     ██████████ CPU: AMD Ryzen 7 (16) @ silent 3.9GHz");
+        printLine("    ███████████ Load: " + cpuLoad);
+        printLine("   ████████████ Memory: " + memUsed + " / " + memTotal);
+        printLine("  █████████████ Terminal: tty1 · maple palette");
+        printLine(`  🍂  ${username}@zen.local  ·  let stillness guide`);
+        printLine("");
+    }
+
+    function matrixEffect() {
+        printLine("🍂  invoking crimson rain · digital sutra...", "matrix");
+        let linesCount = 0;
+        const totalLines = 13;
+        function rainLine() {
+            if (linesCount >= totalLines) {
+                printLine("☯  sequence dissolves into silence.", "matrix");
+                return;
+            }
+            let randomStr = "";
+            let len = 28 + Math.floor(Math.random() * 34);
+            for (let i=0; i<len; i++) {
+                let charSet = "01𖦹☯𖤓⭘𖦥𖦣𖦴𖦵朱紅暮禅空無涯";
+                let r = Math.floor(Math.random() * charSet.length);
+                randomStr += charSet[r];
+            }
+            printLine("  " + randomStr, "matrix");
+            linesCount++;
+            setTimeout(rainLine, 65 + Math.random() * 45);
+        }
+        rainLine();
+    }
+
+    function showStats() {
+        let elapsed = Math.floor((Date.now() - bootStartTime) / 1000);
+        let processes = Math.floor(Math.random() * 160 + 70);
+        let socketConn = Math.floor(Math.random() * 28);
+        printLine(`╭─── 静寂・ stats  ───╮`);
+        printLine(`│ Uptime       : ${Math.floor(elapsed/3600)}h ${Math.floor((elapsed%3600)/60)}m ${elapsed%60}s`);
+        printLine(`│ Sessions     : 1 active (tty1)`);
+        printLine(`│ Processes    : ${processes} quiet threads`);
+        printLine(`│ Memory       : ${(Math.random()*6+2.5).toFixed(1)}G / 32G engaged`);
+        printLine(`│ Net streams  : ${socketConn} open channels`);
+        printLine(`│ Terminal     : 80x24 · zenwidth`);
+        printLine(`╰──────────────────╯`);
+    }
+
+    function exitSession() {
+        clearScreen();
+        printLine("");
+        printLine("┌────────────────────────────────────────────┐", "line shutdown");
+        printLine("│  🍂  SESSION CLOSED.                      │", "line shutdown");
+        printLine("│  walk in peace · the terminal rests       │", "line shutdown");
+        printLine("│  [ ↻ refresh page to awaken again ]       │", "line shutdown");
+        printLine("└────────────────────────────────────────────┘", "line shutdown");
+        state = 'exited';
+        inputContainer.style.display = 'none';
+        cmdInput.disabled = true;
+        if (loadInterval) clearInterval(loadInterval);
+        if (clockInterval) clearInterval(clockInterval);
+    }
+
+    function processInput(inputStr) {
+        if (state === 'askName') {
+            if (inputStr.trim() === "") {
+                printLine("✍️  whisper your name:");
+                return;
+            }
+            setName(inputStr);
+        } 
+        else if (state === 'shell') {
+            if (inputStr.trim() !== "") {
+                printLine(`${promptSpan.textContent} ${inputStr}`);
+                execute(inputStr);
+            }
+            cmdInput.value = '';
+        }
+    }
+
+    function setupInputEnhancements() {
+        cmdInput.addEventListener('keydown', (e) => {
+            if (state !== 'shell' && state !== 'askName') return;
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (commandHistory.length > 0) {
+                    if (historyIndex === 0) historyIndex = commandHistory.length;
+                    historyIndex--;
+                    cmdInput.value = commandHistory[historyIndex];
+                }
+            }
+            else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (commandHistory.length && historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    cmdInput.value = commandHistory[historyIndex];
+                } else if (historyIndex === commandHistory.length - 1) {
+                    historyIndex = commandHistory.length;
+                    cmdInput.value = "";
+                } else if (commandHistory.length === 0) {
+                    cmdInput.value = "";
+                } else {
+                    cmdInput.value = "";
+                    historyIndex = commandHistory.length;
+                }
+            }
+            else if (e.key === 'Tab') {
+                e.preventDefault();
+                let current = cmdInput.value.trim();
+                if (current === "") return;
+                let matches = allCommands.filter(cmd => cmd.startsWith(current.toLowerCase()));
+                if (matches.length === 1) {
+                    cmdInput.value = matches[0];
+                } else if (matches.length > 1) {
+                    printLine(`\npossible paths: ${matches.join('  ')}`);
+                    printLine(`${promptSpan.textContent} ${current}`);
+                }
+            }
+            if (e.key === 'Enter' && state !== 'exited') {
+                let val = cmdInput.value.trim();
+                if (val !== "" && state === 'shell') {
+                    commandHistory.push(val);
+                    if (commandHistory.length > 50) commandHistory.shift();
+                    historyIndex = commandHistory.length;
+                }
+                e.preventDefault();
+                processInput(cmdInput.value);
+                if (state === 'shell') cmdInput.value = '';
+                else if (state === 'askName') cmdInput.value = '';
+            }
+        });
+    }
+
+    function focusTerminal() {
+        if (state !== 'boot' && state !== 'exited') {
+            cmdInput.focus();
+        }
+    }
+    document.querySelector('.terminal').addEventListener('click', focusTerminal);
+
+    function startLiveUpdates() {
+        loadInterval = setInterval(() => {
+            if (state !== 'exited') updateStatusBar();
+        }, 1300);
+        clockInterval = setInterval(() => {
+            if (state !== 'exited') updateStatusBar();
+        }, 1000);
+        updateStatusBar();
+    }
+
+    setInterval(() => {
+        if (state === 'shell' && username) statusUserSpan.innerText = username;
+    }, 500);
+
+    boot();
+    startLiveUpdates();
+    setupInputEnhancements();
+</script>
+</body>
+</html>
